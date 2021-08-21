@@ -15,7 +15,11 @@
     "test": "standard",
     "api": "PROCESS_TYPE=api node index.js",
     "scraper": "PROCESS_TYPE=scraper node index.js",
-    "start": "node index.js"
+    "start": "node index.js",
+    "docker:build-local": "docker build -f api.dockerfile -t ethereum-api-local . --no-cache",
+    "docker:run-local": "docker run --rm --name ethereum-api -d -it ethereum-api-local:latest",
+    "docker:stop-local": "docker stop ethereum-api",
+    "docker:log-local": "docker container logs -t ethereum-api"
   },
   "author": "Harsh Vakharia",
   "license": "MIT",
