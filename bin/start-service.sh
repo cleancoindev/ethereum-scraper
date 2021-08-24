@@ -5,6 +5,6 @@ echo "ENV_ALIAS: ${ENV_ALIAS}"
 echo "--------------------------------"
 echo ""
 
-echo "Starting Ethereum Scraper API..."
+echo "Starting the Ethereum indexer service..."
 
 npm run start

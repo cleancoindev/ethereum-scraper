@@ -21,9 +21,9 @@ COPY LICENSE.md ./
 COPY scraper.js ./
 COPY utils.js ./
 
-# ---------
-# Start API
-# ---------
+# -------------
+# Start Service
+# -------------
 EXPOSE 8080
 
-CMD ["./bin/start-api.sh"]
+CMD ["./bin/start-service.sh"]
