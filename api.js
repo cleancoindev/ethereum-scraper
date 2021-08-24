@@ -4,17 +4,18 @@ const { ethers } = require('ethers')
 const express = require('express')
 const helmet = require('helmet')
 const compression = require('compression')
+const systemDefaults = require('./systemDefaults')
 
 const {
-  PORT,
   WEB3_URI,
   NODE_ENV
 } = process.env
-
-if (!PORT) throw new Error('Invalid PORT')
+const PORT = process.env.PORT || systemDefaults.port
 
 const app = express()
-const ethersProvider = WEB3_URI.startsWith('ws') ? new ethers.providers.WebSocketProvider(WEB3_URI) : new ethers.providers.StaticJsonRpcProvider(WEB3_URI)
+const ethersProvider = WEB3_URI.startsWith('ws')
+  ? new ethers.providers.WebSocketProvider(WEB3_URI)
+  : new ethers.providers.StaticJsonRpcProvider(WEB3_URI)
 
 if (NODE_ENV === 'production') {
   app.use(Sentry.Handlers.requestHandler())

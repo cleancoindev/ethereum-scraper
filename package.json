@@ -3,6 +3,8 @@
   "version": "0.6.0",
   "description": "Ethereum Scraper (Mainly eth_getTransactionsByAccount)",
   "main": "index.js",
+  "author": "Harsh Vakharia",
+  "license": "MIT",
   "bin": {
     "ethereum-scraper": "./bin/ethereum-scraper",
     "ethereum-scraper-api": "./bin/ethereum-scraper-api"
@@ -19,10 +21,9 @@
     "docker:run-local": "docker run --rm --name ethereum-indexer -p 8080:8080 -d -it ethereum-indexer-local:latest",
     "docker:stop-local": "docker stop ethereum-indexer",
     "docker:log-local": "docker container logs -t ethereum-indexer",
-    "test": "standard"
+    "lint": "standard --verbose",
+    "flint": "npm run lint --fix"
   },
-  "author": "Harsh Vakharia",
-  "license": "MIT",
   "dependencies": {
     "@sentry/node": "^5.27.4",
     "bluebird": "^3.7.2",

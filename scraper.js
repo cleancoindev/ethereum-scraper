@@ -2,25 +2,21 @@ const Sentry = require('@sentry/node')
 const Bluebird = require('bluebird')
 const { ethers, BigNumber, logger } = require('ethers')
 
+const systemDefaults = require('./systemDefaults')
 const eventList = require('./eventList')
 const Transaction = require('./models/Transaction')
 const { logParser, isSwapTransaction, EVENT_SIG_MAP } = require('./utils')
 
 const {
   WEB3_URI,
-  MAX_BLOCK_BATCH_SIZE,
-  MAX_TRANSACTION_BATCH_SIZE,
-  START_BLOCK,
-  END_BLOCK,
-  REORG_GAP,
   BLOCKTIME,
   SWAP_ONLY_MODE
 } = process.env
-
-if (!MAX_BLOCK_BATCH_SIZE) throw new Error('Invalid MAX_BLOCK_BATCH_SIZE')
-if (!MAX_TRANSACTION_BATCH_SIZE) throw new Error('Invalid MAX_TRANSACTION_BATCH_SIZE')
-if (!START_BLOCK) throw new Error('Invalid START_BLOCK')
-if (!REORG_GAP) throw new Error('Invalid REORG_GAP')
+const MAX_BLOCK_BATCH_SIZE = process.env.MAX_BLOCK_BATCH_SIZE || systemDefaults.maxBlockBatchSize
+const MAX_TRANSACTION_BATCH_SIZE = process.env.MAX_TRANSACTION_BATCH_SIZE || systemDefaults.maxTransactionBatchSize
+const START_BLOCK = process.env.START_BLOCK || systemDefaults.startBlock
+const END_BLOCK = process.env.END_BLOCK || systemDefaults.endBlock
+const REORG_GAP = process.env.REORG_GAP || systemDefaults.reorgGap
 
 const SUPPORTS_WS = WEB3_URI.startsWith('ws')
 
@@ -245,7 +241,7 @@ async function poll () {
   sync()
 })()
 
-//Patch for RSK Support
+// Patch for RSK Support
 ethersProvider.formatter.receipt = function (value) {
   const result = check(ethersProvider.formatter.formats.receipt, value)
 

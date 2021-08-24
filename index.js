@@ -16,8 +16,8 @@ const {
   PROCESS_TYPE
 } = process.env
 
-if (!MONGO_URI) throw new Error('Invalid MONGO_URI')
-if (!WEB3_URI) throw new Error('Invalid WEB3_URI')
+if (!MONGO_URI) throw new Error('The MONGO_URI setting was not provided.')
+if (!WEB3_URI) throw new Error('The WEB3_URI setting was not provided.')
 
 const mongoose = require('mongoose')
 mongoose.connect(MONGO_URI, { useNewUrlParser: true, useCreateIndex: true, useUnifiedTopology: true })
