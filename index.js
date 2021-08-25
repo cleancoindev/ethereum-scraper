@@ -21,6 +21,9 @@ if (!WEB3_URI) throw new Error('The WEB3_URI setting was not provided.')
 
 const mongoose = require('mongoose')
 mongoose.connect(MONGO_URI, { useNewUrlParser: true, useCreateIndex: true, useUnifiedTopology: true })
+mongoose.connection
+  .on('error', console.error.bind(console, 'connection error:'))
+  .once('open', () => console.info('Connected to MongoDB.'))
 
 switch (PROCESS_TYPE) {
   case 'api':
