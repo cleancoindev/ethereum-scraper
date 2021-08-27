@@ -7,4 +7,5 @@ echo ""
 
 echo "Starting the Ethereum indexer service..."
 
-npm run start
+# npm run start
+npm run api-test

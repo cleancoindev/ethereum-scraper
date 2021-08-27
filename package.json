@@ -14,13 +14,14 @@
     "url": "https://github.com/harshjv/ethereum-scraper.git"
   },
   "scripts": {
+    "api-test": "node simple-test.js",
     "api": "PROCESS_TYPE=api node index.js",
     "scraper": "PROCESS_TYPE=scraper node index.js",
     "start": "node index.js",
-    "docker:build-local": "docker build -f service.dockerfile -t ethereum-indexer-local . --no-cache",
-    "docker:run-local": "docker run --rm --name ethereum-indexer -p 8080:8080 -d -it ethereum-indexer-local:latest",
-    "docker:stop-local": "docker stop ethereum-indexer",
-    "docker:log-local": "docker container logs -t ethereum-indexer",
+    "docker:build-local": "docker build -t ethereum-api-local . --no-cache",
+    "docker:run-local": "docker run --rm --name ethereum-api-local --env MONGO_URI=mongodb://demo:demo-password@docker.for.mac.host.internal:27017/rickandmorty?authSource=test -p 8080:8080 -d -it ethereum-api-local:latest",
+    "docker:stop-local": "docker stop ethereum-api-local",
+    "docker:log-local": "docker container logs -t ethereum-api-local",
     "lint": "standard --verbose",
     "flint": "npm run lint --fix"
   },
