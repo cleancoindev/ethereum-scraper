@@ -22,8 +22,6 @@ COPY scraper.js ./
 COPY systemDefaults.js ./
 COPY utils.js ./
 
-COPY ram-test.js ./
-
 # -------------
 # Start Service
 # -------------

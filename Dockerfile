@@ -10,7 +10,17 @@ COPY package*.json ./
 RUN npm ci
 
 # Bundle app source
-COPY . .
+COPY bin/ ./bin
+COPY middlewares/ ./middlewares
+COPY models/ ./models
+COPY routes/ ./routes
+COPY api.js ./
+COPY eventList.js ./
+COPY index.js ./
+COPY LICENSE.md ./
+COPY scraper.js ./
+COPY systemDefaults.js ./
+COPY utils.js ./
 
 # -------------
 # Start Service

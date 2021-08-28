@@ -8,6 +8,6 @@ module.exports = {
   maxTransactionBatchSize: 15,
   startBlock: 9285500,
   endBlock: null,
-  reorgGap: 10
+  reorgGap: 1
 
 }
