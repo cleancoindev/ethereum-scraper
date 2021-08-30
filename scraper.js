@@ -9,7 +9,6 @@ const { logParser, isSwapTransaction, EVENT_SIG_MAP } = require('./utils')
 
 const {
   WEB3_URI,
-  BLOCKTIME,
   SWAP_ONLY_MODE
 } = process.env
 const MAX_BLOCK_BATCH_SIZE = process.env.MAX_BLOCK_BATCH_SIZE || systemDefaults.maxBlockBatchSize
@@ -17,6 +16,7 @@ const MAX_TRANSACTION_BATCH_SIZE = process.env.MAX_TRANSACTION_BATCH_SIZE || sys
 const START_BLOCK = process.env.START_BLOCK || systemDefaults.startBlock
 const END_BLOCK = process.env.END_BLOCK || systemDefaults.endBlock
 const REORG_GAP = process.env.REORG_GAP || systemDefaults.reorgGap
+const BLOCKTIME = process.env.BLOCKTIME || systemDefaults.blockTime
 
 const SUPPORTS_WS = WEB3_URI.startsWith('ws')
 
