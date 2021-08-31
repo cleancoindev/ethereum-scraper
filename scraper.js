@@ -28,7 +28,7 @@ process.on('unhandledRejection', error => { throw error })
 
 function handleError (e) {
   console.error(e)
-  process.exit(1)
+  // process.exit(1)
 }
 
 if (SUPPORTS_WS) {
