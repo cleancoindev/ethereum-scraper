@@ -17,8 +17,10 @@ const START_BLOCK = process.env.START_BLOCK || systemDefaults.startBlock
 const END_BLOCK = process.env.END_BLOCK || systemDefaults.endBlock
 const REORG_GAP = process.env.REORG_GAP || systemDefaults.reorgGap
 const BLOCKTIME = process.env.BLOCKTIME || systemDefaults.blockTime
-
+const DEBUG = process.env.DEBUG_WORKER === 'yes'
 const SUPPORTS_WS = WEB3_URI.startsWith('ws')
+
+const logHeader = '[WORKER]'
 
 let ethersProvider
 let syncing = true
@@ -57,14 +59,19 @@ async function getTransactionReceipt (hash, attempts = 1) {
 
 async function handleBlock (blockNum) {
   if (!blockNum) return
+  if (DEBUG) console.log(`${logHeader} Handling block (at number):`, blockNum)
 
   const exist = await Transaction.findOne({
     blockNumber: blockNum
   }).exec()
-  if (exist) return
+  if (exist) {
+    if (DEBUG) console.log(`${logHeader} Block is already being indexed:`, exist)
+    return
+  }
 
   const block = await ethersProvider.getBlockWithTransactions(blockNum)
   if (!block) return
+  if (DEBUG) console.log(`${logHeader} Indexing block:`, block)
 
   const blockNumber = block.number
   const blockHash = block.hash
@@ -202,10 +209,12 @@ async function sync () {
 
 async function getLatestBlock () {
   latestBlockNumber = await ethersProvider.getBlockNumber()
+  if (DEBUG) console.log(`${logHeader} Retrieved latest block number:`, latestBlockNumber)
 }
 
 function onNewBlock (blockNumber) {
   latestBlockNumber = blockNumber
+  if (DEBUG) console.log(`${logHeader} Ready to handle new block:`, blockNumber)
 
   if (!syncing && !END_BLOCK) {
     handleBlock(latestBlockNumber - Number(REORG_GAP))
@@ -224,6 +233,7 @@ function subscribe () {
 
 async function poll () {
   if (!BLOCKTIME) throw new Error('Invalid BLOCKTIME')
+  if (DEBUG) console.log(`${logHeader} Polling for new blocks at frequency (in seconds):`, BLOCKTIME)
 
   while (true) {
     const blockNumber = await ethersProvider.getBlockNumber()

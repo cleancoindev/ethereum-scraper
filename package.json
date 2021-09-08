@@ -11,16 +11,24 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/harshjv/ethereum-scraper.git"
+    "url": "https://github.com/liquality/ethereum-scraper.git"
   },
   "scripts": {
     "api": "PROCESS_TYPE=api node index.js",
     "scraper": "PROCESS_TYPE=scraper node index.js",
     "start": "node index.js",
-    "docker:build-local": "docker build -t ethereum-api-local . --no-cache",
-    "docker:run-local": "docker run --rm --name ethereum-api -p 8080:8080 --env-file .env.docker.local -d -it ethereum-api-local:latest",
-    "docker:stop-local": "docker stop ethereum-api",
-    "docker:log-local": "docker container logs -t ethereum-api",
+    "docker:build-api-local": "docker build -f api.dockerfile -t ethereum-indexer-api . --no-cache",
+    "docker:run-api-local": "docker run --rm --name ethereum-indexer-api -p 8080:8080 --env-file .env.docker.local -d -it ethereum-indexer-api:latest",
+    "docker:stop-api-local": "docker stop ethereum-indexer-api",
+    "docker:log-api-local": "docker container logs -t ethereum-indexer-api",
+    "docker:build-worker-local": "docker build -f worker.dockerfile -t ethereum-indexer-worker . --no-cache",
+    "docker:run-worker-local": "docker run --rm --name ethereum-indexer-worker --env-file .env.docker.local -d -it ethereum-indexer-worker:latest",
+    "docker:stop-worker-local": "docker stop ethereum-indexer-worker",
+    "docker:log-worker-local": "docker container logs -t ethereum-indexer-worker",
+    "docker:build-local": "docker build -f service.dockerfile -t ethereum-indexer-service . --no-cache",
+    "docker:run-local": "docker run --rm --name ethereum-indexer-service -p 8080:8080 --env-file .env.docker.local -d -it ethereum-indexer-service:latest",
+    "docker:stop-local": "docker stop ethereum-indexer-service",
+    "docker:log-local": "docker container logs -t ethereum-indexer-service",
     "lint": "standard --verbose",
     "flint": "npm run lint --fix"
   },
