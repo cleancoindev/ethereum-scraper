@@ -19,7 +19,7 @@ module.exports = {
   // The write capacity for MongoDB batch updates
   // (blockSize * transactionSize = transactions per batch)
   // --------------------------------------------------------
-  maxBlockBatchSize: 10,       // Number of blocks to handle per batch
+  maxBlockBatchSize: 10, // Number of blocks to handle per batch
   maxTransactionBatchSize: 15, // Number of transactions to handle per block
 
   // --------------------------------------------------------

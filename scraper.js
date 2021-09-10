@@ -1,3 +1,4 @@
+/* eslint-disable camelcase */
 const Sentry = require('@sentry/node')
 const Bluebird = require('bluebird')
 const { ethers, BigNumber, logger } = require('ethers')
@@ -263,37 +264,34 @@ ethersProvider.formatter.receipt = function (value) {
 
   if (result.root != null) {
     if (result.root.length <= 4) {
-      result.root = result.root == '0x' ? '0x0' : result.root
+      result.root = result.root == '0x' ? '0x0' : result.root // eslint-disable-line eqeqeq
       const tx_root = BigNumber.from(result.root).toNumber()
       if (tx_root === 0 || tx_root === 1) {
         if (result.status != null && (result.status !== tx_root)) {
-          logger.throwArgumentError("alt-root-status/status mismatch", "value", { root: result.root, status: result.status })
+          logger.throwArgumentError('alt-root-status/status mismatch', 'value', { root: result.root, status: result.status })
         }
         result.status = tx_root
         delete result.root
+      } else {
+        logger.throwArgumentError('invalid alt-root-status', 'value.root', result.root)
       }
-      else {
-        logger.throwArgumentError("invalid alt-root-status", "value.root", result.root)
-      }
-    }
-    else if (result.root.length !== 66) {
-      logger.throwArgumentError("invalid root hash", "value.root", result.root)
+    } else if (result.root.length !== 66) {
+      logger.throwArgumentError('invalid root hash', 'value.root', result.root)
     }
   }
 
   return result
 }
 
-function check(format, object) {
+function check (format, object) {
   const result = {}
   for (const key in format) {
     try {
-      let value = format[key](object[key])
+      const value = format[key](object[key])
       if (value !== undefined) {
         result[key] = value
       }
-    }
-    catch (error) {
+    } catch (error) {
       error.checkKey = key
       error.checkValue = object[key]
       throw error
