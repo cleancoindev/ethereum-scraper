@@ -2,6 +2,7 @@
 const Sentry = require('@sentry/node')
 const Bluebird = require('bluebird')
 const { ethers, BigNumber, logger } = require('ethers')
+const DEBUG = require('debug')('worker')
 
 const systemDefaults = require('./systemDefaults')
 const eventList = require('./eventList')
@@ -18,10 +19,7 @@ const START_BLOCK = process.env.START_BLOCK || systemDefaults.startBlock
 const END_BLOCK = process.env.END_BLOCK || systemDefaults.endBlock
 const REORG_GAP = process.env.REORG_GAP || systemDefaults.reorgGap
 const BLOCKTIME = process.env.BLOCKTIME || systemDefaults.blockTime
-const DEBUG = process.env.DEBUG_WORKER === 'yes'
 const SUPPORTS_WS = WEB3_URI.startsWith('ws')
-
-const logHeader = '[WORKER]'
 
 let ethersProvider
 let syncing = true
@@ -60,13 +58,13 @@ async function getTransactionReceipt (hash, attempts = 1) {
 
 async function handleBlock (blockNum) {
   if (!blockNum) return
-  if (DEBUG) console.log(`${logHeader} Handling block (at number):`, blockNum)
+  DEBUG(`Handling block at: ${blockNum}`)
 
   const exist = await Transaction.findOne({
     blockNumber: blockNum
   }).exec()
   if (exist) {
-    if (DEBUG) console.log(`${logHeader} Block is already being indexed.`)
+    DEBUG('Block is already being indexed.')
     return
   }
 
@@ -77,7 +75,7 @@ async function handleBlock (blockNum) {
   const blockHash = block.hash
   const timestamp = block.timestamp
 
-  if (DEBUG) console.log(`${logHeader} Indexing block num:${blockNumber} hash:${blockHash} time:${timestamp}`)
+  DEBUG(`Indexing block num:${blockNumber} hash:${blockHash} time:${timestamp}`)
 
   const events = {}
   let transactions = []
@@ -171,9 +169,11 @@ async function handleBlock (blockNum) {
 }
 
 async function sync () {
-  if (DEBUG) console.log(`${logHeader} Starting sync for block range: ${START_BLOCK} to ${END_BLOCK}`)
+  DEBUG(`Starting sync for block range: ${START_BLOCK} to ${END_BLOCK}`)
+
   const lastBlockInRange = await Transaction.getLastBlockInRange(START_BLOCK, END_BLOCK)
-  if (DEBUG) console.log(`${logHeader} Last block in range: ${lastBlockInRange}`)
+
+  DEBUG(`Last block in range: ${lastBlockInRange}`)
 
   let startFrom
   if (lastBlockInRange) {
@@ -181,11 +181,10 @@ async function sync () {
   } else {
     startFrom = Number(START_BLOCK)
   }
-  if (DEBUG) console.log(`${logHeader} Setting start index at: ${startFrom}`)
+  DEBUG(`Setting start index: ${startFrom}`)
 
   let batch = []
   for (let i = startFrom; ; i++) {
-    if (DEBUG) console.log(`${logHeader} Will handle block: ${i}`)
     batch.push(handleBlock(i))
 
     if (batch.length === Number(MAX_BLOCK_BATCH_SIZE)) {
@@ -194,12 +193,12 @@ async function sync () {
     }
 
     if (END_BLOCK && i >= Number(END_BLOCK)) {
-      console.log(`${logHeader} Reached END_BLOCK`, END_BLOCK)
+      console.log('Reached END_BLOCK', END_BLOCK)
       break
     }
 
     if (latestBlockNumber && i >= latestBlockNumber) {
-      console.log(`${logHeader} Reached latestBlockNumber`, latestBlockNumber)
+      console.log('Reached latestBlockNumber', latestBlockNumber)
       break
     }
   }
@@ -210,17 +209,17 @@ async function sync () {
 
   syncing = false
 
-  console.log(`${logHeader} Synced!`)
+  console.log('Synced!')
 }
 
 async function getLatestBlock () {
   latestBlockNumber = await ethersProvider.getBlockNumber()
-  if (DEBUG) console.log(`${logHeader} Retrieved latest block number:`, latestBlockNumber)
+  DEBUG(`Retrieved latest block number: ${latestBlockNumber}`)
 }
 
 function onNewBlock (blockNumber) {
   latestBlockNumber = blockNumber
-  if (DEBUG) console.log(`${logHeader} Ready to handle new block:`, blockNumber)
+  DEBUG(`Ready to handle new block: ${blockNumber}`)
 
   if (!syncing && !END_BLOCK) {
     handleBlock(latestBlockNumber - Number(REORG_GAP))
@@ -239,11 +238,13 @@ function subscribe () {
 
 async function poll () {
   if (!BLOCKTIME) throw new Error('Invalid BLOCKTIME')
-  if (DEBUG) console.log(`${logHeader} Polling for new blocks at frequency (in ms):`, BLOCKTIME)
+
+  DEBUG(`Polling for new blocks at frequency (in ms): ${BLOCKTIME}`)
 
   while (true) {
     const blockNumber = await ethersProvider.getBlockNumber()
-    if (DEBUG) console.log(`${logHeader} Head block: ${latestBlockNumber} New block? ${blockNumber}`)
+    DEBUG(`Head block: ${latestBlockNumber} New block? ${blockNumber}`)
+
     if (latestBlockNumber === blockNumber) {
       await sleep(Number(BLOCKTIME))
     } else {
@@ -251,12 +252,6 @@ async function poll () {
     }
   }
 }
-
-;(async () => {
-  await getLatestBlock()
-  SUPPORTS_WS ? subscribe() : poll()
-  sync()
-})()
 
 // Patch for RSK Support
 ethersProvider.formatter.receipt = function (value) {
@@ -299,3 +294,12 @@ function check (format, object) {
   }
   return result
 }
+
+// -----------------------------------------------------------------------------
+// Run worker
+// -----------------------------------------------------------------------------
+;(async () => {
+  await getLatestBlock()
+  SUPPORTS_WS ? subscribe() : poll()
+  sync()
+})()
