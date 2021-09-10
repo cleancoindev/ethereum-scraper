@@ -65,17 +65,18 @@ async function handleBlock (blockNum) {
     blockNumber: blockNum
   }).exec()
   if (exist) {
-    if (DEBUG) console.log(`${logHeader} Block is already being indexed:`, exist)
+    if (DEBUG) console.log(`${logHeader} Block is already being indexed.`)
     return
   }
 
   const block = await ethersProvider.getBlockWithTransactions(blockNum)
   if (!block) return
-  if (DEBUG) console.log(`${logHeader} Indexing block:`, block)
 
   const blockNumber = block.number
   const blockHash = block.hash
   const timestamp = block.timestamp
+
+  if (DEBUG) console.log(`${logHeader} Indexing block num:${blockNumber} hash:${blockHash} time:${timestamp}`)
 
   const events = {}
   let transactions = []
@@ -169,7 +170,9 @@ async function handleBlock (blockNum) {
 }
 
 async function sync () {
+  if (DEBUG) console.log(`${logHeader} Starting sync for block range: ${START_BLOCK} to ${END_BLOCK}`)
   const lastBlockInRange = await Transaction.getLastBlockInRange(START_BLOCK, END_BLOCK)
+  if (DEBUG) console.log(`${logHeader} Last block in range: ${lastBlockInRange}`)
 
   let startFrom
   if (lastBlockInRange) {
@@ -177,9 +180,11 @@ async function sync () {
   } else {
     startFrom = Number(START_BLOCK)
   }
+  if (DEBUG) console.log(`${logHeader} Setting start index at: ${startFrom}`)
 
   let batch = []
   for (let i = startFrom; ; i++) {
+    if (DEBUG) console.log(`${logHeader} Will handle block: ${i}`)
     batch.push(handleBlock(i))
 
     if (batch.length === Number(MAX_BLOCK_BATCH_SIZE)) {
@@ -188,12 +193,12 @@ async function sync () {
     }
 
     if (END_BLOCK && i >= Number(END_BLOCK)) {
-      console.log('Reached END_BLOCK', END_BLOCK)
+      console.log(`${logHeader} Reached END_BLOCK`, END_BLOCK)
       break
     }
 
     if (latestBlockNumber && i >= latestBlockNumber) {
-      console.log('Reached latestBlockNumber', latestBlockNumber)
+      console.log(`${logHeader} Reached latestBlockNumber`, latestBlockNumber)
       break
     }
   }
@@ -204,7 +209,7 @@ async function sync () {
 
   syncing = false
 
-  console.log('Synced!')
+  console.log(`${logHeader} Synced!`)
 }
 
 async function getLatestBlock () {
@@ -233,10 +238,11 @@ function subscribe () {
 
 async function poll () {
   if (!BLOCKTIME) throw new Error('Invalid BLOCKTIME')
-  if (DEBUG) console.log(`${logHeader} Polling for new blocks at frequency (in seconds):`, BLOCKTIME)
+  if (DEBUG) console.log(`${logHeader} Polling for new blocks at frequency (in ms):`, BLOCKTIME)
 
   while (true) {
     const blockNumber = await ethersProvider.getBlockNumber()
+    if (DEBUG) console.log(`${logHeader} Head block: ${latestBlockNumber} New block? ${blockNumber}`)
     if (latestBlockNumber === blockNumber) {
       await sleep(Number(BLOCKTIME))
     } else {

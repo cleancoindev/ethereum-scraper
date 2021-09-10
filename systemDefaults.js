@@ -29,10 +29,10 @@ module.exports = {
   reorgGap: 10,
 
   // --------------------------------------------------------
-  // The poll frequency of the Infura endpoint (in seconds)
+  // The poll frequency of the Infura endpoint (in ms)
   // (for transaction confirmation requests)
   // NOTE: This is only relevant when using an HTTPS endpoint
   // --------------------------------------------------------
-  blockTime: 15 // seconds
+  blockTime: 15000 // millseconds
 
 }
