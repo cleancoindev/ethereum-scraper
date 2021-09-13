@@ -8,7 +8,7 @@ on:
 env:
   # AWS settings
   ENV_ALIAS: 'chainhub'
-  AWS_REGION: 'us-east-2'
+  AWS_REGION: 'us-east-1'
   ECS_SERVICE: 'wallet-services-chainhub'
 
   # ethereum-indexer-api
