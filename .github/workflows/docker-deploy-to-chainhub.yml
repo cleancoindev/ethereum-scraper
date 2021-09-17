@@ -1,77 +1,77 @@
-name: 'Docker deploy to ECR (chainhub)'
-
-on:
-  push:
-    branches:
-      - dockerized
-
-env:
-  # AWS settings
-  AWS_REGION: 'us-east-1'
-
-  # ethereum-indexer-api
-  ETH_API_IMAGE_NAME: 'ethereum-indexer-api'
-  ETH_API_IMAGE_TAG: 'latest'
-  ETH_API_DOCKERFILE_PATH: 'api.dockerfile'
-
-  # ethereum-indexer-worker
-  ETH_WORKER_IMAGE_NAME: 'ethereum-indexer-worker'
-  ETH_WORKER_IMAGE_TAG: 'latest'
-  ETH_WORKER_DOCKERFILE_PATH: 'worker.dockerfile'
-
-jobs:
-  docker-deploy:
-    name: 'Build & Deploy Image'
-    runs-on: ubuntu-latest
-    environment: chainhub
-
-    defaults:
-      run:
-        shell: bash
-
-    steps:
-      # Checkout the repository to the GitHub Actions runner
-      - name: Checkout
-        uses: actions/checkout@v2
-
-      # Load AWS credentials
-      - name: Load AWS creds
-        uses: aws-actions/configure-aws-credentials@v1
-        with:
-          role-skip-session-tagging: true
-          aws-region: ${{ env.AWS_REGION }}
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
-          role-duration-seconds: 1200
-
-      # Login to ECR
-      - name: Login to AWS ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v1
-
-      # Build, tag, and push Docker image to ECR (eth api)
-      - name: Build, tag, push image to ECR (eth api)
-        id: build-api-image
-        env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          # IMAGE_TAG: ${{ github.sha }}
-        run: |
-          echo "Building and tagging Docker image ($ETH_API_IMAGE_NAME)"
-          docker build -f $ETH_API_DOCKERFILE_PATH -t $ETH_API_IMAGE_NAME . --no-cache
-          docker tag $ETH_API_IMAGE_NAME:$ETH_API_IMAGE_TAG $ECR_REGISTRY/$ETH_API_IMAGE_NAME:$ETH_API_IMAGE_TAG
-          echo "Pushing image to registry: $REGISTRY_URI/$ETH_API_IMAGE_NAME"
-          docker push $ECR_REGISTRY/$ETH_API_IMAGE_NAME:$ETH_API_IMAGE_TAG
-
-      # Build, tag, and push Docker image to ECR (eth worker)
-      - name: Build, tag, push image to ECR (eth worker)
-        id: build-worker-image
-        env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          # IMAGE_TAG: ${{ github.sha }}
-        run: |
-          echo "Building and tagging Docker image ($ETH_WORKER_IMAGE_NAME)"
-          docker build -f $ETH_WORKER_DOCKERFILE_PATH -t $ETH_WORKER_IMAGE_NAME . --no-cache
-          docker tag $ETH_WORKER_IMAGE_NAME:$ETH_WORKER_IMAGE_TAG $ECR_REGISTRY/$ETH_WORKER_IMAGE_NAME:$ETH_WORKER_IMAGE_TAG
-          echo "Pushing image to registry: $REGISTRY_URI/$ETH_WORKER_IMAGE_NAME"
-          docker push $ECR_REGISTRY/$ETH_WORKER_IMAGE_NAME:$ETH_WORKER_IMAGE_TAG
+# name: 'Docker deploy to ECR (chainhub)'
+#
+# on:
+#   push:
+#     branches:
+#       - dockerized
+#
+# env:
+#   # AWS settings
+#   AWS_REGION: 'us-east-1'
+#
+#   # ethereum-indexer-api
+#   ETH_API_IMAGE_NAME: 'ethereum-indexer-api'
+#   ETH_API_IMAGE_TAG: 'latest'
+#   ETH_API_DOCKERFILE_PATH: 'api.dockerfile'
+#
+#   # ethereum-indexer-worker
+#   ETH_WORKER_IMAGE_NAME: 'ethereum-indexer-worker'
+#   ETH_WORKER_IMAGE_TAG: 'latest'
+#   ETH_WORKER_DOCKERFILE_PATH: 'worker.dockerfile'
+# 
+# jobs:
+#   docker-deploy:
+#     name: 'Build & Deploy Image'
+#     runs-on: ubuntu-latest
+#     environment: chainhub
+#
+#     defaults:
+#       run:
+#         shell: bash
+#
+#     steps:
+#       # Checkout the repository to the GitHub Actions runner
+#       - name: Checkout
+#         uses: actions/checkout@v2
+#
+#       # Load AWS credentials
+#       - name: Load AWS creds
+#         uses: aws-actions/configure-aws-credentials@v1
+#         with:
+#           role-skip-session-tagging: true
+#           aws-region: ${{ env.AWS_REGION }}
+#           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+#           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+#           role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+#           role-duration-seconds: 1200
+#
+#       # Login to ECR
+#       - name: Login to AWS ECR
+#         id: login-ecr
+#         uses: aws-actions/amazon-ecr-login@v1
+#
+#       # Build, tag, and push Docker image to ECR (eth api)
+#       - name: Build, tag, push image to ECR (eth api)
+#         id: build-api-image
+#         env:
+#           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+#           # IMAGE_TAG: ${{ github.sha }}
+#         run: |
+#           echo "Building and tagging Docker image ($ETH_API_IMAGE_NAME)"
+#           docker build -f $ETH_API_DOCKERFILE_PATH -t $ETH_API_IMAGE_NAME . --no-cache
+#           docker tag $ETH_API_IMAGE_NAME:$ETH_API_IMAGE_TAG $ECR_REGISTRY/$ETH_API_IMAGE_NAME:$ETH_API_IMAGE_TAG
+#           echo "Pushing image to registry: $REGISTRY_URI/$ETH_API_IMAGE_NAME"
+#           docker push $ECR_REGISTRY/$ETH_API_IMAGE_NAME:$ETH_API_IMAGE_TAG
+#
+#       # Build, tag, and push Docker image to ECR (eth worker)
+#       - name: Build, tag, push image to ECR (eth worker)
+#         id: build-worker-image
+#         env:
+#           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+#           # IMAGE_TAG: ${{ github.sha }}
+#         run: |
+#           echo "Building and tagging Docker image ($ETH_WORKER_IMAGE_NAME)"
+#           docker build -f $ETH_WORKER_DOCKERFILE_PATH -t $ETH_WORKER_IMAGE_NAME . --no-cache
+#           docker tag $ETH_WORKER_IMAGE_NAME:$ETH_WORKER_IMAGE_TAG $ECR_REGISTRY/$ETH_WORKER_IMAGE_NAME:$ETH_WORKER_IMAGE_TAG
+#           echo "Pushing image to registry: $REGISTRY_URI/$ETH_WORKER_IMAGE_NAME"
+#           docker push $ECR_REGISTRY/$ETH_WORKER_IMAGE_NAME:$ETH_WORKER_IMAGE_TAG
