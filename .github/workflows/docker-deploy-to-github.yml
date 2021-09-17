@@ -1,4 +1,4 @@
-name: Docker deploy to GitHub
+name: 'Docker deploy to GitHub'
 
 on:
   push:
@@ -46,7 +46,7 @@ jobs:
         run: |
           echo "Building and tagging Docker image ($ETH_API_IMAGE_NAME)"
           docker build -f $ETH_API_DOCKERFILE_PATH -t $ETH_API_IMAGE_NAME . --no-cache
-          docker tag $ETH_API_IMAGE_NAME:$ETH_API_IMAGE_TAG $REGISTRY/$ETH_API_IMAGE_NAME:$ETH_API_IMAGE_TAG
+          docker tag $ETH_API_IMAGE_NAME:$ETH_API_IMAGE_TAG $REGISTRY/liquality/$ETH_API_IMAGE_NAME:$ETH_API_IMAGE_TAG
           echo "Pushing image to registry: $REGISTRY/liquality/$ETH_API_IMAGE_NAME"
           docker push $REGISTRY/liquality/$ETH_API_IMAGE_NAME:$ETH_API_IMAGE_TAG
 
