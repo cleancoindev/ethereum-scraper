@@ -16,6 +16,7 @@
   "scripts": {
     "api": "PROCESS_TYPE=api node index.js",
     "scraper": "PROCESS_TYPE=scraper node index.js",
+    "scraper-debug": "DEBUG=worker PROCESS_TYPE=scraper node index.js",
     "start": "node index.js",
     "docker:build-api-local": "docker build -f api.dockerfile -t ethereum-indexer-api . --no-cache",
     "docker:run-api-local": "docker run --rm --name ethereum-indexer-api -p 8080:8080 --env-file .env.docker.local -d -it ethereum-indexer-api:latest",
