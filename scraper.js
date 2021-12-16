@@ -26,10 +26,17 @@ let syncing = true
 let latestBlockNumber = null
 
 process.on('unhandledRejection', error => { throw error })
+process.on('SIGINT', handleSignals)
+process.on('SIGTERM', handleSignals)
 
 function handleError (e) {
   console.error(e)
   // process.exit(1)
+}
+
+function handleSignals (signal) {
+  console.log('Received signal from parent', signal)
+  process.exit(1)
 }
 
 if (SUPPORTS_WS) {

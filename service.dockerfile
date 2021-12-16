@@ -27,4 +27,4 @@ COPY utils.js ./
 # -------------
 EXPOSE 8080
 
-CMD ["./bin/start-service.sh"]
+CMD ["npm","run","api"]

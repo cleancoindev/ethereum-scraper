@@ -24,4 +24,4 @@ COPY utils.js ./
 # -------------
 # Start Service
 # -------------
-CMD ["./bin/start-worker.sh"]
+CMD ["npm","run","scraper"]
