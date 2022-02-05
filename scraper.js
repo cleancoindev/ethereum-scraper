@@ -1,305 +1,343 @@
 /* eslint-disable camelcase */
-const Sentry = require('@sentry/node')
-const Bluebird = require('bluebird')
-const { ethers, BigNumber, logger } = require('ethers')
-const DEBUG = require('debug')('worker')
+const Sentry = require("@sentry/node");
+const Bluebird = require("bluebird");
+const { ethers, BigNumber, logger } = require("ethers");
+const DEBUG = require("debug")("worker");
 
-const systemDefaults = require('./systemDefaults')
-const eventList = require('./eventList')
-const Transaction = require('./models/Transaction')
-const { logParser, isSwapTransaction, EVENT_SIG_MAP } = require('./utils')
+const systemDefaults = require("./systemDefaults");
+const eventList = require("./eventList");
+const Transaction = require("./models/Transaction");
+const { logParser, isSwapTransaction, EVENT_SIG_MAP } = require("./utils");
 
-const {
-  WEB3_URI,
-  SWAP_ONLY_MODE
-} = process.env
-const MAX_BLOCK_BATCH_SIZE = process.env.MAX_BLOCK_BATCH_SIZE || systemDefaults.maxBlockBatchSize
-const MAX_TRANSACTION_BATCH_SIZE = process.env.MAX_TRANSACTION_BATCH_SIZE || systemDefaults.maxTransactionBatchSize
-const START_BLOCK = process.env.START_BLOCK || systemDefaults.startBlock
-const END_BLOCK = process.env.END_BLOCK || systemDefaults.endBlock
-const REORG_GAP = process.env.REORG_GAP || systemDefaults.reorgGap
-const BLOCKTIME = process.env.BLOCKTIME || systemDefaults.blockTime
-const SUPPORTS_WS = WEB3_URI.startsWith('ws')
+const { WEB3_URI, SWAP_ONLY_MODE } = process.env;
+const MAX_BLOCK_BATCH_SIZE =
+  process.env.MAX_BLOCK_BATCH_SIZE || systemDefaults.maxBlockBatchSize;
+const MAX_TRANSACTION_BATCH_SIZE =
+  process.env.MAX_TRANSACTION_BATCH_SIZE ||
+  systemDefaults.maxTransactionBatchSize;
+const START_BLOCK = process.env.START_BLOCK || systemDefaults.startBlock;
+const END_BLOCK = process.env.END_BLOCK || systemDefaults.endBlock;
+const REORG_GAP = process.env.REORG_GAP || systemDefaults.reorgGap;
+const BLOCKTIME = process.env.BLOCKTIME || systemDefaults.blockTime;
+const SUPPORTS_WS = WEB3_URI.startsWith("ws");
 
-let ethersProvider
-let syncing = true
-let latestBlockNumber = null
+let ethersProvider;
+let syncing = true;
+let latestBlockNumber = null;
 
-process.on('unhandledRejection', error => { throw error })
+process.on("unhandledRejection", (error) => {
+  throw error;
+});
 
-function handleError (e) {
-  console.error(e)
-  // process.exit(1)
+function handleError(e) {
+  console.error(e);
 }
 
 if (SUPPORTS_WS) {
-  ethersProvider = new ethers.providers.WebSocketProvider(WEB3_URI)
-  ethersProvider.on('error', handleError)
-  ethersProvider.on('end', handleError)
+  ethersProvider = new ethers.providers.WebSocketProvider(WEB3_URI);
+  ethersProvider.on("error", handleError);
+  ethersProvider.on("end", handleError);
 } else {
-  ethersProvider = new ethers.providers.StaticJsonRpcProvider(WEB3_URI)
+  ethersProvider = new ethers.providers.StaticJsonRpcProvider(WEB3_URI);
 }
 
-async function sleep (duration) {
-  return new Promise(resolve => setTimeout(resolve, duration))
+async function sleep(duration) {
+  return new Promise((resolve) => setTimeout(resolve, duration));
 }
 
-async function getTransactionReceipt (hash, attempts = 1) {
-  const receipt = await ethersProvider.getTransactionReceipt(hash)
-  if (receipt) return receipt
+async function getTransactionReceipt(hash, attempts = 1) {
+  const receipt = await ethersProvider.getTransactionReceipt(hash);
+  if (receipt) return receipt;
 
   if (attempts <= 3) {
-    await sleep(5000)
-    return getTransactionReceipt(hash, attempts + 1)
+    await sleep(5000);
+    return getTransactionReceipt(hash, attempts + 1);
   }
 
-  throw new Error('Unable to fetch transaction receipt')
+  throw new Error("Unable to fetch transaction receipt");
 }
 
-async function handleBlock (blockNum) {
-  if (!blockNum) return
-  DEBUG(`Handling block at: ${blockNum}`)
+async function handleBlock(blockNum) {
+  if (!blockNum) return;
+  DEBUG(`Handling block at: ${blockNum}`);
 
   const exist = await Transaction.findOne({
-    blockNumber: blockNum
-  }).exec()
+    blockNumber: blockNum,
+  }).exec();
   if (exist) {
-    DEBUG('Block is already being indexed.')
-    return
+    DEBUG("Block is already being indexed.");
+    return;
   }
 
-  const block = await ethersProvider.getBlockWithTransactions(blockNum)
-  if (!block) return
+  const block = await ethersProvider.getBlockWithTransactions(blockNum);
+  if (!block) return;
 
-  const blockNumber = block.number
-  const blockHash = block.hash
-  const timestamp = block.timestamp
+  const blockNumber = block.number;
+  const blockHash = block.hash;
+  const timestamp = block.timestamp;
 
-  DEBUG(`Indexing block num:${blockNumber} hash:${blockHash} time:${timestamp}`)
+  DEBUG(
+    `Indexing block num:${blockNumber} hash:${blockHash} time:${timestamp}`
+  );
 
-  const events = {}
-  let transactions = []
-  let blockTransactions = block.transactions.map(tx => ({ ...tx, input: tx.data }))
+  const events = {};
+  let transactions = [];
+  let blockTransactions = block.transactions.map((tx) => ({
+    ...tx,
+    input: tx.data,
+  }));
 
-  if (SWAP_ONLY_MODE === 'true') {
-    const eventTopics = Object.keys(EVENT_SIG_MAP)
-    const blockEvents = await ethersProvider.getLogs({ topics: [eventTopics], fromBlock: blockNum, toBlock: blockNum })
-    const blockTransactionsWithEvents = blockEvents.map(e => e.transactionHash)
-    blockTransactions = blockTransactions.filter(tx => isSwapTransaction(tx) || blockTransactionsWithEvents.includes(tx.hash))
+  if (SWAP_ONLY_MODE === "true") {
+    const eventTopics = Object.keys(EVENT_SIG_MAP);
+    const blockEvents = await ethersProvider.getLogs({
+      topics: [eventTopics],
+      fromBlock: blockNum,
+      toBlock: blockNum,
+    });
+    const blockTransactionsWithEvents = blockEvents.map(
+      (e) => e.transactionHash
+    );
+    blockTransactions = blockTransactions.filter(
+      (tx) =>
+        isSwapTransaction(tx) || blockTransactionsWithEvents.includes(tx.hash)
+    );
   }
 
-  await Bluebird.map(blockTransactions, async ({ hash, from, to, input, value }) => {
-    try {
-      const { status, contractAddress, logs } = await getTransactionReceipt(hash)
+  await Bluebird.map(
+    blockTransactions,
+    async ({ hash, from, to, input, value }) => {
+      try {
+        const { status, contractAddress, logs } = await getTransactionReceipt(
+          hash
+        );
 
-      logs
-        .map(logParser)
-        .filter(l => !!l)
-        .forEach(({ model, contractAddress, data }) => {
-          const commons = { hash, blockHash, blockNumber, status, timestamp }
+        logs
+          .map(logParser)
+          .filter((l) => !!l)
+          .forEach(({ model, contractAddress, data }) => {
+            const commons = { hash, blockHash, blockNumber, status, timestamp };
 
-          if (!events[model.modelName]) events[model.modelName] = []
-          events[model.modelName].push({
-            ...commons,
-            ...data,
-            contractAddress
-          })
-        })
+            if (!events[model.modelName]) events[model.modelName] = [];
+            events[model.modelName].push({
+              ...commons,
+              ...data,
+              contractAddress,
+            });
+          });
 
-      transactions.push({
-        from,
-        to,
-        hash,
-        blockHash,
-        blockNumber,
-        status,
-        input,
-        contractAddress,
-        timestamp,
-        value
-      })
-    } catch (e) {
-      Sentry.withScope(scope => {
-        scope.setTag('blockNumber', blockNumber)
-        scope.setTag('blockHash', blockHash)
-        scope.setTag('hash', hash)
-        scope.setTag('from', from)
-        scope.setTag('to', to)
+        transactions.push({
+          from,
+          to,
+          hash,
+          blockHash,
+          blockNumber,
+          status,
+          input,
+          contractAddress,
+          timestamp,
+          value,
+        });
+      } catch (e) {
+        Sentry.withScope((scope) => {
+          scope.setTag("blockNumber", blockNumber);
+          scope.setTag("blockHash", blockHash);
+          scope.setTag("hash", hash);
+          scope.setTag("from", from);
+          scope.setTag("to", to);
 
-        scope.setExtra('input', input)
-        scope.setExtra('value', value)
+          scope.setExtra("input", input);
+          scope.setExtra("value", value);
 
-        Sentry.captureException(e)
-      })
+          Sentry.captureException(e);
+        });
 
-      throw e
-    }
-  }, { concurrency: Number(MAX_TRANSACTION_BATCH_SIZE) })
+        throw e;
+      }
+    },
+    { concurrency: Number(MAX_TRANSACTION_BATCH_SIZE) }
+  );
 
   if (transactions.length === 0) {
-    transactions = [{
-      blockHash,
-      blockNumber
-    }]
+    transactions = [
+      {
+        blockHash,
+        blockNumber,
+      },
+    ];
   }
 
-  await Transaction.insertMany(transactions, { ordered: false })
+  await Transaction.insertMany(transactions, { ordered: false });
 
-  const eventEntries = Object.entries(events)
-  await Bluebird.map(eventEntries, async ([modelName, _events]) => {
-    if (_events.length > 0) {
-      const event = eventList.find(event => event.model.modelName === modelName)
-      if (!event) throw new Error(`Unknown event model: ${modelName}`)
-      await event.model.insertMany(_events, { ordered: false })
-    }
-  }, { concurrency: 1 })
+  const eventEntries = Object.entries(events);
+  await Bluebird.map(
+    eventEntries,
+    async ([modelName, _events]) => {
+      if (_events.length > 0) {
+        const event = eventList.find(
+          (event) => event.model.modelName === modelName
+        );
+        if (!event) throw new Error(`Unknown event model: ${modelName}`);
+        await event.model.insertMany(_events, { ordered: false });
+      }
+    },
+    { concurrency: 1 }
+  );
 
-  const log = [
-    `#${blockNumber}[${block.transactions.length}]`
-  ]
+  const log = [`#${blockNumber}[${block.transactions.length}]`];
 
-  const compareWith = Number(END_BLOCK) || latestBlockNumber
+  const compareWith = Number(END_BLOCK) || latestBlockNumber;
   if (compareWith) {
-    const diff = compareWith - blockNum
-    const progress = Math.floor((1 - (diff / compareWith)) * 10000) / 100
-    log.push(`${progress}%`)
+    const diff = compareWith - blockNum;
+    const progress = Math.floor((1 - diff / compareWith) * 10000) / 100;
+    log.push(`${progress}%`);
   }
 
-  console.log(log.join(' '))
+  console.log(log.join(" "));
 }
 
-async function sync () {
-  DEBUG(`Starting sync for block range: ${START_BLOCK} to ${END_BLOCK}`)
+async function sync() {
+  DEBUG(`Starting sync for block range: ${START_BLOCK} to ${END_BLOCK}`);
 
-  const lastBlockInRange = await Transaction.getLastBlockInRange(START_BLOCK, END_BLOCK)
+  const lastBlockInRange = await Transaction.getLastBlockInRange(
+    START_BLOCK,
+    END_BLOCK
+  );
 
-  DEBUG(`Last block in range: ${lastBlockInRange}`)
+  DEBUG(`Last block in range: ${lastBlockInRange}`);
 
-  let startFrom
+  let startFrom;
   if (lastBlockInRange) {
-    startFrom = lastBlockInRange + 1
+    startFrom = lastBlockInRange + 1;
   } else {
-    startFrom = Number(START_BLOCK)
+    startFrom = Number(START_BLOCK);
   }
-  DEBUG(`Setting start index: ${startFrom}`)
+  DEBUG(`Setting start index: ${startFrom}`);
 
-  let batch = []
+  let batch = [];
   for (let i = startFrom; ; i++) {
-    batch.push(handleBlock(i))
+    batch.push(handleBlock(i));
 
     if (batch.length === Number(MAX_BLOCK_BATCH_SIZE)) {
-      await Promise.all(batch)
-      batch = []
+      await Promise.all(batch);
+      batch = [];
     }
 
     if (END_BLOCK && i >= Number(END_BLOCK)) {
-      console.log('Reached END_BLOCK', END_BLOCK)
-      break
+      console.log("Reached END_BLOCK", END_BLOCK);
+      break;
     }
 
     if (latestBlockNumber && i >= latestBlockNumber) {
-      console.log('Reached latestBlockNumber', latestBlockNumber)
-      break
+      console.log("Reached latestBlockNumber", latestBlockNumber);
+      break;
     }
   }
 
   if (batch.length !== 0) {
-    await Promise.all(batch)
+    await Promise.all(batch);
   }
 
-  syncing = false
+  syncing = false;
 
-  console.log('Synced!')
+  console.log("Synced!");
 }
 
-async function getLatestBlock () {
-  latestBlockNumber = await ethersProvider.getBlockNumber()
-  DEBUG(`Retrieved latest block number: ${latestBlockNumber}`)
+async function getLatestBlock() {
+  latestBlockNumber = await ethersProvider.getBlockNumber();
+  DEBUG(`Retrieved latest block number: ${latestBlockNumber}`);
 }
 
-function onNewBlock (blockNumber) {
-  latestBlockNumber = blockNumber
-  DEBUG(`Ready to handle new block: ${blockNumber}`)
+function onNewBlock(blockNumber) {
+  latestBlockNumber = blockNumber;
+  DEBUG(`Ready to handle new block: ${blockNumber}`);
 
   if (!syncing && !END_BLOCK) {
-    handleBlock(latestBlockNumber - Number(REORG_GAP))
+    handleBlock(latestBlockNumber - Number(REORG_GAP));
   }
 }
 
-function subscribe () {
-  ethersProvider.on('block', (blockNumber) => {
-    onNewBlock(blockNumber)
-  })
+function subscribe() {
+  ethersProvider.on("block", (blockNumber) => {
+    onNewBlock(blockNumber);
+  });
 
-  ethersProvider.on('error', (error) => {
-    handleError(error)
-  })
+  ethersProvider.on("error", (error) => {
+    handleError(error);
+  });
 }
 
-async function poll () {
-  if (!BLOCKTIME) throw new Error('Invalid BLOCKTIME')
+async function poll() {
+  if (!BLOCKTIME) throw new Error("Invalid BLOCKTIME");
 
-  DEBUG(`Polling for new blocks at frequency (in ms): ${BLOCKTIME}`)
+  DEBUG(`Polling for new blocks at frequency (in ms): ${BLOCKTIME}`);
 
   while (true) {
-    const blockNumber = await ethersProvider.getBlockNumber()
-    DEBUG(`Head block: ${latestBlockNumber} New block? ${blockNumber}`)
+    const blockNumber = await ethersProvider.getBlockNumber();
+    DEBUG(`Head block: ${latestBlockNumber} New block? ${blockNumber}`);
 
     if (latestBlockNumber === blockNumber) {
-      await sleep(Number(BLOCKTIME))
+      await sleep(Number(BLOCKTIME));
     } else {
-      await onNewBlock(latestBlockNumber + 1)
+      await onNewBlock(latestBlockNumber + 1);
     }
   }
 }
 
 // Patch for RSK Support
 ethersProvider.formatter.receipt = function (value) {
-  const result = check(ethersProvider.formatter.formats.receipt, value)
+  const result = check(ethersProvider.formatter.formats.receipt, value);
 
   if (result.root != null) {
     if (result.root.length <= 4) {
-      result.root = result.root == '0x' ? '0x0' : result.root // eslint-disable-line eqeqeq
-      const tx_root = BigNumber.from(result.root).toNumber()
+      result.root = result.root == "0x" ? "0x0" : result.root; // eslint-disable-line eqeqeq
+      const tx_root = BigNumber.from(result.root).toNumber();
       if (tx_root === 0 || tx_root === 1) {
-        if (result.status != null && (result.status !== tx_root)) {
-          logger.throwArgumentError('alt-root-status/status mismatch', 'value', { root: result.root, status: result.status })
+        if (result.status != null && result.status !== tx_root) {
+          logger.throwArgumentError(
+            "alt-root-status/status mismatch",
+            "value",
+            { root: result.root, status: result.status }
+          );
         }
-        result.status = tx_root
-        delete result.root
+        result.status = tx_root;
+        delete result.root;
       } else {
-        logger.throwArgumentError('invalid alt-root-status', 'value.root', result.root)
+        logger.throwArgumentError(
+          "invalid alt-root-status",
+          "value.root",
+          result.root
+        );
       }
     } else if (result.root.length !== 66) {
-      logger.throwArgumentError('invalid root hash', 'value.root', result.root)
+      logger.throwArgumentError("invalid root hash", "value.root", result.root);
     }
   }
 
-  return result
-}
+  return result;
+};
 
-function check (format, object) {
-  const result = {}
+function check(format, object) {
+  const result = {};
   for (const key in format) {
     try {
-      const value = format[key](object[key])
+      const value = format[key](object[key]);
       if (value !== undefined) {
-        result[key] = value
+        result[key] = value;
       }
     } catch (error) {
-      error.checkKey = key
-      error.checkValue = object[key]
-      throw error
+      error.checkKey = key;
+      error.checkValue = object[key];
+      throw error;
     }
   }
-  return result
+  return result;
 }
 
 // -----------------------------------------------------------------------------
 // Run worker
 // -----------------------------------------------------------------------------
-;(async () => {
-  await getLatestBlock()
-  SUPPORTS_WS ? subscribe() : poll()
-  sync()
-})()
+(async () => {
+  await getLatestBlock();
+  SUPPORTS_WS ? subscribe() : poll();
+  sync();
+})();
