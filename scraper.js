@@ -25,7 +25,10 @@ let ethersProvider
 let syncing = true
 let latestBlockNumber = null
 
-process.on('unhandledRejection', error => { throw error })
+process.on('unhandledRejection', (error) => {
+   handleError(e) 
+  }
+)
 
 function handleError (e) {
   console.error(e)
