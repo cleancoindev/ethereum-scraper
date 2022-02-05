@@ -9,7 +9,10 @@ const eventList = require('./eventList')
 const Transaction = require('./models/Transaction')
 const { logParser, isSwapTransaction, EVENT_SIG_MAP } = require('./utils')
 
-const { WEB3_URI, SWAP_ONLY_MODE } = process.env
+const {
+  WEB3_URI,
+  SWAP_ONLY_MODE
+} = process.env
 const MAX_BLOCK_BATCH_SIZE = process.env.MAX_BLOCK_BATCH_SIZE || systemDefaults.maxBlockBatchSize
 const MAX_TRANSACTION_BATCH_SIZE = process.env.MAX_TRANSACTION_BATCH_SIZE || systemDefaults.maxTransactionBatchSize
 const START_BLOCK = process.env.START_BLOCK || systemDefaults.startBlock
@@ -22,12 +25,11 @@ let ethersProvider
 let syncing = true
 let latestBlockNumber = null
 
-process.on('unhandledRejection', (error) => {
-  throw error
-})
+process.on('unhandledRejection', error => { throw error })
 
-function handleError(e) {
+function handleError (e) {
   console.error(e)
+  // process.exit(1)
 }
 
 if (SUPPORTS_WS) {
@@ -38,11 +40,11 @@ if (SUPPORTS_WS) {
   ethersProvider = new ethers.providers.StaticJsonRpcProvider(WEB3_URI)
 }
 
-async function sleep(duration) {
-  return new Promise((resolve) => setTimeout(resolve, duration))
+async function sleep (duration) {
+  return new Promise(resolve => setTimeout(resolve, duration))
 }
 
-async function getTransactionReceipt(hash, attempts = 1) {
+async function getTransactionReceipt (hash, attempts = 1) {
   const receipt = await ethersProvider.getTransactionReceipt(hash)
   if (receipt) return receipt
 
@@ -54,7 +56,7 @@ async function getTransactionReceipt(hash, attempts = 1) {
   throw new Error('Unable to fetch transaction receipt')
 }
 
-async function handleBlock(blockNum) {
+async function handleBlock (blockNum) {
   if (!blockNum) return
   DEBUG(`Handling block at: ${blockNum}`)
 
@@ -77,113 +79,96 @@ async function handleBlock(blockNum) {
 
   const events = {}
   let transactions = []
-  let blockTransactions = block.transactions.map((tx) => ({
-    ...tx,
-    input: tx.data
-  }))
+  let blockTransactions = block.transactions.map(tx => ({ ...tx, input: tx.data }))
 
   if (SWAP_ONLY_MODE === 'true') {
     const eventTopics = Object.keys(EVENT_SIG_MAP)
-    const blockEvents = await ethersProvider.getLogs({
-      topics: [eventTopics],
-      fromBlock: blockNum,
-      toBlock: blockNum
-    })
-    const blockTransactionsWithEvents = blockEvents.map((e) => e.transactionHash)
-    blockTransactions = blockTransactions.filter(
-      (tx) => isSwapTransaction(tx) || blockTransactionsWithEvents.includes(tx.hash)
-    )
+    const blockEvents = await ethersProvider.getLogs({ topics: [eventTopics], fromBlock: blockNum, toBlock: blockNum })
+    const blockTransactionsWithEvents = blockEvents.map(e => e.transactionHash)
+    blockTransactions = blockTransactions.filter(tx => isSwapTransaction(tx) || blockTransactionsWithEvents.includes(tx.hash))
   }
 
-  await Bluebird.map(
-    blockTransactions,
-    async ({ hash, from, to, input, value }) => {
-      try {
-        const { status, contractAddress, logs } = await getTransactionReceipt(hash)
+  await Bluebird.map(blockTransactions, async ({ hash, from, to, input, value }) => {
+    try {
+      const { status, contractAddress, logs } = await getTransactionReceipt(hash)
 
-        logs
-          .map(logParser)
-          .filter((l) => !!l)
-          .forEach(({ model, contractAddress, data }) => {
-            const commons = { hash, blockHash, blockNumber, status, timestamp }
+      logs
+        .map(logParser)
+        .filter(l => !!l)
+        .forEach(({ model, contractAddress, data }) => {
+          const commons = { hash, blockHash, blockNumber, status, timestamp }
 
-            if (!events[model.modelName]) events[model.modelName] = []
-            events[model.modelName].push({
-              ...commons,
-              ...data,
-              contractAddress
-            })
+          if (!events[model.modelName]) events[model.modelName] = []
+          events[model.modelName].push({
+            ...commons,
+            ...data,
+            contractAddress
           })
-
-        transactions.push({
-          from,
-          to,
-          hash,
-          blockHash,
-          blockNumber,
-          status,
-          input,
-          contractAddress,
-          timestamp,
-          value
-        })
-      } catch (e) {
-        Sentry.withScope((scope) => {
-          scope.setTag('blockNumber', blockNumber)
-          scope.setTag('blockHash', blockHash)
-          scope.setTag('hash', hash)
-          scope.setTag('from', from)
-          scope.setTag('to', to)
-
-          scope.setExtra('input', input)
-          scope.setExtra('value', value)
-
-          Sentry.captureException(e)
         })
 
-        throw e
-      }
-    },
-    { concurrency: Number(MAX_TRANSACTION_BATCH_SIZE) }
-  )
+      transactions.push({
+        from,
+        to,
+        hash,
+        blockHash,
+        blockNumber,
+        status,
+        input,
+        contractAddress,
+        timestamp,
+        value
+      })
+    } catch (e) {
+      Sentry.withScope(scope => {
+        scope.setTag('blockNumber', blockNumber)
+        scope.setTag('blockHash', blockHash)
+        scope.setTag('hash', hash)
+        scope.setTag('from', from)
+        scope.setTag('to', to)
+
+        scope.setExtra('input', input)
+        scope.setExtra('value', value)
+
+        Sentry.captureException(e)
+      })
+
+      throw e
+    }
+  }, { concurrency: Number(MAX_TRANSACTION_BATCH_SIZE) })
 
   if (transactions.length === 0) {
-    transactions = [
-      {
-        blockHash,
-        blockNumber
-      }
-    ]
+    transactions = [{
+      blockHash,
+      blockNumber
+    }]
   }
 
   await Transaction.insertMany(transactions, { ordered: false })
 
   const eventEntries = Object.entries(events)
-  await Bluebird.map(
-    eventEntries,
-    async ([modelName, _events]) => {
-      if (_events.length > 0) {
-        const event = eventList.find((event) => event.model.modelName === modelName)
-        if (!event) throw new Error(`Unknown event model: ${modelName}`)
-        await event.model.insertMany(_events, { ordered: false })
-      }
-    },
-    { concurrency: 1 }
-  )
+  await Bluebird.map(eventEntries, async ([modelName, _events]) => {
+    if (_events.length > 0) {
+      const event = eventList.find(event => event.model.modelName === modelName)
+      if (!event) throw new Error(`Unknown event model: ${modelName}`)
+      await event.model.insertMany(_events, { ordered: false })
+    }
+  }, { concurrency: 1 })
 
-  const log = [`#${blockNumber}[${block.transactions.length}]`]
+  const log = [
+    `#${blockNumber}[${block.transactions.length}]`
+  ]
 
   const compareWith = Number(END_BLOCK) || latestBlockNumber
   if (compareWith) {
     const diff = compareWith - blockNum
-    const progress = Math.floor((1 - diff / compareWith) * 10000) / 100
+    const progress = Math.floor((1 - (diff / compareWith)) * 10000) / 100
     log.push(`${progress}%`)
   }
 
   console.log(log.join(' '))
 }
 
-async function sync() {
+async function sync () {
   DEBUG(`Starting sync for block range: ${START_BLOCK} to ${END_BLOCK}`)
 
   const lastBlockInRange = await Transaction.getLastBlockInRange(START_BLOCK, END_BLOCK)
@@ -227,12 +212,12 @@ async function sync() {
   console.log('Synced!')
 }
 
-async function getLatestBlock() {
+async function getLatestBlock () {
   latestBlockNumber = await ethersProvider.getBlockNumber()
   DEBUG(`Retrieved latest block number: ${latestBlockNumber}`)
 }
 
-function onNewBlock(blockNumber) {
+function onNewBlock (blockNumber) {
   latestBlockNumber = blockNumber
   DEBUG(`Ready to handle new block: ${blockNumber}`)
 
@@ -241,7 +226,7 @@ function onNewBlock(blockNumber) {
   }
 }
 
-function subscribe() {
+function subscribe () {
   ethersProvider.on('block', (blockNumber) => {
     onNewBlock(blockNumber)
   })
@@ -251,7 +236,7 @@ function subscribe() {
   })
 }
 
-async function poll() {
+async function poll () {
   if (!BLOCKTIME) throw new Error('Invalid BLOCKTIME')
 
   DEBUG(`Polling for new blocks at frequency (in ms): ${BLOCKTIME}`)
@@ -277,11 +262,8 @@ ethersProvider.formatter.receipt = function (value) {
       result.root = result.root == '0x' ? '0x0' : result.root // eslint-disable-line eqeqeq
       const tx_root = BigNumber.from(result.root).toNumber()
       if (tx_root === 0 || tx_root === 1) {
-        if (result.status != null && result.status !== tx_root) {
-          logger.throwArgumentError('alt-root-status/status mismatch', 'value', {
-            root: result.root,
-            status: result.status
-          })
+        if (result.status != null && (result.status !== tx_root)) {
+          logger.throwArgumentError('alt-root-status/status mismatch', 'value', { root: result.root, status: result.status })
         }
         result.status = tx_root
         delete result.root
@@ -296,7 +278,7 @@ ethersProvider.formatter.receipt = function (value) {
   return result
 }
 
-function check(format, object) {
+function check (format, object) {
   const result = {}
   for (const key in format) {
     try {
